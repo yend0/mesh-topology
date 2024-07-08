@@ -14,8 +14,7 @@ typedef struct
 {
     packet_type type;
 
-    int route[MAX_NODES];
-    int route_length;
+    int network_graph[MAX_NODES][MAX_NODES];
 
     union
     {
@@ -29,6 +28,7 @@ typedef struct
             uint16_t crc;
         } mac_packet;
     };
+
 } Packet;
 
 Packet create_mac_packet(uint8_t sender, uint8_t receiver, uint8_t ttl, const char *message)
