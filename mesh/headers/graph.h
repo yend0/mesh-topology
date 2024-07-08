@@ -4,15 +4,11 @@
 #include "stdafx.h"
 #include "constants.h"
 
-extern int graph[MAX_NODES][MAX_NODES];
-extern int distances[MAX_NODES];
-extern bool visited[MAX_NODES];
-extern int predecessors[MAX_NODES];
-
-void initialize_graph(const int size);
-void add_edge(const int u, const int v, const int weight);
-void dijkstra(const int start_vertex, const int size);
-void get_path(const int start_vertex, const int end_vertex,
-              char *path, const char *vertex_data[MAX_NODES]);
+void initialize_graph(int size, int graph[MAX_NODES][MAX_NODES]);
+void add_edge(int u, int v, int weight, int graph[MAX_NODES][MAX_NODES]);
+void add_edges(int matrix_size, int graph[MAX_NODES][MAX_NODES]);
+void dijkstra(int graph[MAX_NODES][MAX_NODES], int start_node, int num_nodes, int distances[MAX_NODES], int predecessors[MAX_NODES]);
+void print_path(int node, int predecessors[MAX_NODES]);
+void print_paths(int start_node, int num_nodes, int predecessors[MAX_NODES]);
 
 #endif // GRAPH_H

@@ -3,16 +3,50 @@
 
 #include "graph.h"
 
-int graph[MAX_NODES][MAX_NODES];
-int distances[MAX_NODES];
-bool visited[MAX_NODES];
-int predecessors[MAX_NODES];
-
-void initialize_graph(const int size)
+void add_edges(int matrix_size, int graph[MAX_NODES][MAX_NODES])
 {
-    for (int i = 0; i < size; ++i)
+    for (int row = 0; row < matrix_size; row++)
     {
-        for (int j = 0; j < size; ++j)
+        for (int col = 0; col < matrix_size; col++)
+        {
+            int node = row * matrix_size + col;
+
+            // Right neighbor
+            if (col + 1 < matrix_size)
+            {
+                int right_neighbor = row * matrix_size + (col + 1);
+                add_edge(node, right_neighbor, 1, graph);
+            }
+
+            // Down neighbor
+            if (row + 1 < matrix_size)
+            {
+                int down_neighbor = (row + 1) * matrix_size + col;
+                add_edge(node, down_neighbor, 1, graph);
+            }
+
+            // Bottom-right diagonal neighbor
+            if (row + 1 < matrix_size && col + 1 < matrix_size)
+            {
+                int bottom_right_neighbor = (row + 1) * matrix_size + (col + 1);
+                add_edge(node, bottom_right_neighbor, 1, graph);
+            }
+
+            // Bottom-left diagonal neighbor
+            if (row + 1 < matrix_size && col - 1 >= 0)
+            {
+                int bottom_left_neighbor = (row + 1) * matrix_size + (col - 1);
+                add_edge(node, bottom_left_neighbor, 1, graph);
+            }
+        }
+    }
+}
+
+void initialize_graph(int size, int graph[MAX_NODES][MAX_NODES])
+{
+    for (int i = 0; i < size; i++)
+    {
+        for (int j = 0; j < size; j++)
         {
             if (i == j)
                 graph[i][j] = 0;
@@ -22,29 +56,31 @@ void initialize_graph(const int size)
     }
 }
 
-void add_edge(const int u, const int v, const int weight)
+void add_edge(int u, int v, int weight, int graph[MAX_NODES][MAX_NODES])
 {
     graph[u][v] = weight;
     graph[v][u] = weight;
 }
 
-void dijkstra(const int start_vertex, const int size)
+void dijkstra(int graph[MAX_NODES][MAX_NODES], int start_node, int num_nodes, int distances[MAX_NODES], int predecessors[MAX_NODES])
 {
-    for (int i = 0; i < size; ++i)
+    bool visited[MAX_NODES];
+
+    for (int i = 0; i < num_nodes; i++)
     {
         distances[i] = INF;
         visited[i] = false;
         predecessors[i] = -1;
     }
 
-    distances[start_vertex] = 0;
+    distances[start_node] = 0;
 
-    for (int i = 0; i < size; ++i)
+    for (int i = 0; i < num_nodes; i++)
     {
         int min_distance = INF;
         int u = -1;
 
-        for (int j = 0; j < size; ++j)
+        for (int j = 0; j < num_nodes; j++)
         {
             if (!visited[j] && distances[j] < min_distance)
             {
@@ -58,7 +94,7 @@ void dijkstra(const int start_vertex, const int size)
 
         visited[u] = true;
 
-        for (int v = 0; v < size; ++v)
+        for (int v = 0; v < num_nodes; v++)
         {
             if (graph[u][v] != INF && !visited[v])
             {
@@ -73,38 +109,33 @@ void dijkstra(const int start_vertex, const int size)
     }
 }
 
-void get_path(const int start_vertex, const int end_vertex,
-              char *path, const char *vertex_data[MAX_NODES])
+void print_path(int node, int predecessors[MAX_NODES])
 {
-    int current = end_vertex;
-    char temp_path[1024] = "";
-    char buffer[100];
-
-    while (current != -1)
+    if (predecessors[node] == -1)
     {
-        snprintf(buffer, sizeof(buffer), "%s", vertex_data[current]);
-        strcat(temp_path, buffer);
+        printf("%d", node);
+        return;
+    }
+    print_path(predecessors[node], predecessors);
+    printf(" -> %d", node);
+}
 
-        if (current == start_vertex)
+void print_paths(int start_node, int num_nodes, int predecessors[MAX_NODES])
+{
+    for (int i = 0; i < num_nodes; i++)
+    {
+        if (i != start_node)
         {
-            break;
-        }
-
-        current = predecessors[current];
-
-        if (current != -1)
-        {
-            strcat(temp_path, "->");
+            printf("Path from %d to %d: ", start_node, i);
+            if (predecessors[i] == -1)
+            {
+                printf("No path\n");
+            }
+            else
+            {
+                print_path(i, predecessors);
+                printf("\n");
+            }
         }
     }
-
-    int len = strlen(temp_path);
-    for (int i = 0; i < len / 2; ++i)
-    {
-        char tmp = temp_path[i];
-        temp_path[i] = temp_path[len - i - 1];
-        temp_path[len - i - 1] = tmp;
-    }
-
-    strcpy(path, temp_path);
 }
