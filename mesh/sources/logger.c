@@ -33,7 +33,7 @@ void log_message(const char *creator, const message_type type,
     time_t now = time(NULL);
     struct tm *t = localtime(&now);
     char time_str[20];
-    strftime(time_str, sizeof(time_str) - 1, "%Y-%m-%d %H:%M:%S", t);
+    strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", t);
 
     fprintf(logfile, "[%s] [%s] [%s] ", creator, get_message_type_string(type), time_str);
 
