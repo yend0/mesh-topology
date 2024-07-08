@@ -5,16 +5,42 @@ cmake_minimum_required(VERSION 3.28)
 project(mesh-topology)
 
 # Установка переменной со списком исходников
-set(SOURCE_EXE sources/main.c)
+set(server 
+# sources
+mesh/sources/server.c
+mesh/sources/common.c
+mesh/sources/graph.c
+mesh/sources/logger.c
+# headers
+mesh/headers/common.h
+mesh/headers/graph.h
+mesh/headers/stdafx.h
+mesh/headers/constants.h
+mesh/headers/packet.h
+mesh/headers/logger.h
+)
+
+set(node 
+# sources
+mesh/sources/node.c
+mesh/sources/common.c
+mesh/sources/logger.c
+# headers
+mesh/headers/common.h
+mesh/headers/stdafx.h
+mesh/headers/constants.h
+mesh/headers/packet.h
+mesh/headers/logger.h
+
+)
 
 # Расположение заголовочных файлов
-include_directories(sources/mesh/headers/)
+include_directories(mesh/headers/)
 
 # Создает исполняемый файл
-add_executable(mesh-network-app src/main.c)
+add_executable(app-server ${server})
+add_executable(app-node ${node})
 
-# Добавление подпроекта, указывается имя дирректории
-add_subdirectory(sources/mesh)
-
-# Линковка программы с библиотекой
-target_link_libraries(mesh-network-app mesh)
+find_package(ZLIB REQUIRED)
+target_link_libraries(app-node ZLIB::ZLIB)
+target_link_libraries(app-server ZLIB::ZLIB)
