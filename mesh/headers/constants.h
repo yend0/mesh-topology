@@ -8,7 +8,7 @@
 #define MAX_MESSAGE_LENGTH 150
 
 #define BROADCAST_RADIUS 3
-#define TTL_LIMIT 10
+#define TTL_LIMIT 64
 
 #define INF INT_MAX
 
