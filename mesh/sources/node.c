@@ -9,6 +9,66 @@
 int node_id;
 int client_socket;
 
+int find_next_hop(int current_node, int destination_node, int graph[MAX_NODES][MAX_NODES], int size)
+{
+    int distances[MAX_NODES];
+    bool visited[MAX_NODES];
+    int predecessors[MAX_NODES];
+
+    for (int i = 0; i < size; i++)
+    {
+        distances[i] = INF;
+        visited[i] = false;
+        predecessors[i] = -1;
+    }
+
+    distances[current_node] = 0;
+
+    for (int i = 0; i < size; i++)
+    {
+        int min_distance = INF;
+        int u = -1;
+        for (int j = 0; j < size; j++)
+        {
+            if (!visited[j] && distances[j] < min_distance)
+            {
+                min_distance = distances[j];
+                u = j;
+            }
+        }
+
+        if (u == -1)
+            break;
+
+        visited[u] = true;
+
+        for (int v = 0; v < size; v++)
+        {
+            if (graph[u][v] != INF && !visited[v])
+            {
+                int alt = distances[u] + graph[u][v];
+                if (alt < distances[v])
+                {
+                    distances[v] = alt;
+                    predecessors[v] = u;
+                }
+            }
+        }
+    }
+
+    if (predecessors[destination_node] == -1)
+        return -1;
+
+    // Реконструкция пути и получение следующего узла
+    int next_hop = destination_node;
+    while (predecessors[next_hop] != current_node)
+    {
+        next_hop = predecessors[next_hop];
+    }
+
+    return next_hop;
+}
+
 void send_mac_packet(Packet *packet)
 {
     if (packet->mac_packet.ttl <= 0)
@@ -17,7 +77,15 @@ void send_mac_packet(Packet *packet)
         return;
     }
 
-    int next_node = packet->route[packet->route_length - packet->mac_packet.ttl];
+    int next_node = find_next_hop(node_id, packet->mac_packet.mac_receiver, packet->network_graph, MAX_NODES);
+
+    printf("next_node: %d\n", next_node);
+
+    if (next_node == -1)
+    {
+        log_message("CLIENT", MSG_TYPE_ERROR, "Next hop not found, packet dropped");
+        return;
+    }
     packet->mac_packet.ttl--;
 
     struct sockaddr_in node_address;
@@ -32,7 +100,7 @@ void send_mac_packet(Packet *packet)
     }
     else
     {
-        log_message("CLIENT", MSG_TYPE_DATA, "Sent MAC packet to node %d, ttl %d", packet->mac_packet.mac_receiver, packet->mac_packet.ttl);
+        log_message("CLIENT", MSG_TYPE_DATA, "Sent MAC packet from %d to node %d, ttl %d", node_id, next_node, packet->mac_packet.ttl);
     }
 }
 
@@ -60,6 +128,7 @@ void receive_packet()
             {
                 if (packet.type == PACKET_TYPE_MAC)
                 {
+
                     if (packet.mac_packet.mac_receiver == node_id)
                     {
                         log_message("CLIENT", MSG_TYPE_DATA, "Message for this node: %s", packet.mac_packet.message);

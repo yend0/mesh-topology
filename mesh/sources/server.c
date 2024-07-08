@@ -58,13 +58,11 @@ void send_packet_to_next_node(Packet *packet)
             log_message("SERVER", MSG_TYPE_ERROR, "TTL expired, packet dropped");
             return;
         }
-
-        int next_node = packet->route[packet->route_length - packet->mac_packet.ttl];
         packet->mac_packet.ttl--;
 
         struct sockaddr_in node_address;
         node_address.sin_family = AF_INET;
-        node_address.sin_port = htons(CLIENT_BASE_PORT + next_node);
+        node_address.sin_port = htons(CLIENT_BASE_PORT + 0);
         node_address.sin_addr.s_addr = INADDR_ANY;
 
         int sent_bytes = sendto(client_socket, packet, sizeof(Packet), 0, (struct sockaddr *)&node_address, sizeof(node_address));
@@ -75,34 +73,16 @@ void send_packet_to_next_node(Packet *packet)
         }
         else
         {
-            log_message("SERVER", MSG_TYPE_DATA, "Sent MAC packet to node %d, ttl %d", next_node, packet->mac_packet.ttl);
+            log_message("SERVER", MSG_TYPE_DATA, "Sent MAC packet to node %d, ttl %d", 0, packet->mac_packet.ttl);
         }
     }
 }
 
-void create_and_send_mac_packet(int src, int dest, const char *message)
+void create_and_send_mac_packet(const int src, const int dest, int graph[MAX_NODES][MAX_NODES], const int size_graph, const char *message)
 {
-    dijkstra(src, MAX_NODES);
-    int route[MAX_NODES];
-    int route_length = 0;
-    int u = dest;
+    Packet packet = create_mac_packet(src, dest, TTL_LIMIT, message);
 
-    while (u != -1)
-    {
-        route[route_length++] = u;
-        u = predecessors[u];
-    }
-
-    for (int i = 0; i < route_length / 2; ++i)
-    {
-        int temp = route[i];
-        route[i] = route[route_length - i - 1];
-        route[route_length - i - 1] = temp;
-    }
-
-    Packet packet = create_mac_packet(src, dest, route_length - 1, message);
-    memcpy(packet.route, route, route_length * sizeof(int));
-    packet.route_length = route_length;
+    memcpy(packet.network_graph, graph, size_graph * size_graph * sizeof(int));
 
     send_packet_to_next_node(&packet);
 }
@@ -111,11 +91,14 @@ int main()
 {
     signal(SIGINT, handle_signal);
 
-    initialize_graph(MAX_NODES);
+    int graph[MAX_NODES][MAX_NODES];
+    int matrix_size = 10;
 
-    add_edge(0, 1, 1);
-    add_edge(1, 2, 1);
-    add_edge(2, 3, 1);
+    initialize_graph(MAX_NODES, graph);
+    add_edges(matrix_size, graph);
+
+    int distances[MAX_NODES];
+    int predecessors[MAX_NODES];
 
     client_socket = socket(AF_INET, SOCK_DGRAM, 0);
     if (client_socket == -1)
@@ -143,7 +126,7 @@ int main()
         char message[MAX_MESSAGE_LENGTH];
         if (sscanf(command, "send %d %[^\n]", &node_id, message) == 2)
         {
-            create_and_send_mac_packet(0, node_id, message);
+            create_and_send_mac_packet(-1, node_id, graph, MAX_NODES, message);
         }
         else
         {
