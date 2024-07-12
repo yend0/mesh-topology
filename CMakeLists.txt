@@ -10,6 +10,7 @@ set(server
 mesh/sources/server.c
 mesh/sources/common.c
 mesh/sources/graph.c
+mesh/sources/packet.c
 mesh/sources/logger.c
 # headers
 mesh/headers/common.h
@@ -25,6 +26,7 @@ set(node
 mesh/sources/node.c
 mesh/sources/common.c
 mesh/sources/graph.c
+mesh/sources/packet.c
 mesh/sources/logger.c
 # headers
 mesh/headers/common.h
