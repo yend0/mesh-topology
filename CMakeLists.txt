@@ -1,10 +1,10 @@
-# Проверка версии CMake
+# Checking the CMake version
 cmake_minimum_required(VERSION 3.28)
 
-# Название проекта
+# Project name
 project(mesh-topology)
 
-# Установка переменной со списком исходников
+# Set the variable with the list of sources
 set(server 
 # sources
 mesh/sources/server.c
@@ -36,13 +36,17 @@ mesh/headers/logger.h
 
 )
 
-# Расположение заголовочных файлов
+# Location of header files
 include_directories(mesh/headers/)
 
-# Создает исполняемый файл
+# Creates an executable file for the server
 add_executable(app-server ${server})
+
+# Creates an executable file for the client
 add_executable(app-node ${node})
 
 find_package(ZLIB REQUIRED)
+
+# Linking libraries
 target_link_libraries(app-node ZLIB::ZLIB)
 target_link_libraries(app-server ZLIB::ZLIB)
