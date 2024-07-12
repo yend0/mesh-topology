@@ -50,7 +50,7 @@ void handle_signal(int sig)
     exit(EXIT_SUCCESS);
 }
 
-void send_packet_to_next_node(Packet *packet)
+void send_command_to_node(Packet *packet)
 {
     if (packet->type == PACKET_TYPE_MAC)
     {
@@ -59,11 +59,12 @@ void send_packet_to_next_node(Packet *packet)
             log_message("SERVER", MSG_TYPE_NOT_VALID_DATA, "TTL expired, packet dropped");
             return;
         }
+
         packet->mac_packet.ttl--;
 
         struct sockaddr_in node_address;
         node_address.sin_family = AF_INET;
-        node_address.sin_port = htons(CLIENT_BASE_PORT + 0);
+        node_address.sin_port = htons(CLIENT_BASE_PORT + packet->mac_packet.mac_sender);
         node_address.sin_addr.s_addr = INADDR_ANY;
 
         int sent_bytes = sendto(client_socket, packet, sizeof(Packet), 0, (struct sockaddr *)&node_address, sizeof(node_address));
@@ -72,20 +73,16 @@ void send_packet_to_next_node(Packet *packet)
         {
             log_message("SERVER", MSG_TYPE_ERROR, "sendto() failed");
         }
-        else
-        {
-            log_message("SERVER", MSG_TYPE_DATA, "Sent MAC packet to node %d, ttl %d", 0, packet->mac_packet.ttl);
-        }
     }
 }
 
-void create_and_send_mac_packet(const int src, const int dest, int graph[MAX_NODES][MAX_NODES], const int size_graph, const char *message)
+void create_and_send_command(const int src, const int dest, int graph[MAX_NODES][MAX_NODES], const int size_graph, const char *message)
 {
     Packet packet = create_mac_packet(src, dest, TTL_LIMIT, message);
 
     memcpy(packet.network_graph, graph, size_graph * size_graph * sizeof(int));
 
-    send_packet_to_next_node(&packet);
+    send_command_to_node(&packet);
 }
 
 int main()
@@ -120,14 +117,14 @@ int main()
     while (1)
     {
         char command[256];
-        printf("Enter command (send <node_id> <message>): ");
+        printf("Enter command (send <source_node> <dest_node> <message>): ");
         fgets(command, sizeof(command), stdin);
 
-        int node_id;
+        int src_node, dest_node;
         char message[MAX_MESSAGE_LENGTH];
-        if (sscanf(command, "send %d %[^\n]", &node_id, message) == 2)
+        if (sscanf(command, "send %d %d %[^\n]", &src_node, &dest_node, message) == 3)
         {
-            create_and_send_mac_packet(SERVER_ID, node_id, graph, MAX_NODES, message);
+            create_and_send_command(src_node, dest_node, graph, MAX_NODES, message);
         }
         else
         {
