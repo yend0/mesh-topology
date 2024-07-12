@@ -2,6 +2,7 @@
 #include <sys/wait.h>
 
 #include "graph.h"
+#include "constants.h"
 #include "logger.h"
 #include "packet.h"
 
@@ -53,9 +54,9 @@ void send_packet_to_next_node(Packet *packet)
 {
     if (packet->type == PACKET_TYPE_MAC)
     {
-        if (packet->mac_packet.ttl <= 0)
+        if (packet->mac_packet.ttl == 0)
         {
-            log_message("SERVER", MSG_TYPE_ERROR, "TTL expired, packet dropped");
+            log_message("SERVER", MSG_TYPE_NOT_VALID_DATA, "TTL expired, packet dropped");
             return;
         }
         packet->mac_packet.ttl--;
@@ -126,7 +127,7 @@ int main()
         char message[MAX_MESSAGE_LENGTH];
         if (sscanf(command, "send %d %[^\n]", &node_id, message) == 2)
         {
-            create_and_send_mac_packet(-1, node_id, graph, MAX_NODES, message);
+            create_and_send_mac_packet(SERVER_ID, node_id, graph, MAX_NODES, message);
         }
         else
         {

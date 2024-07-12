@@ -1,6 +1,9 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <errno.h>
+#include <unistd.h>
+#include <signal.h>
+#include <fcntl.h>
 
 #include "constants.h"
 #include "logger.h"
@@ -59,7 +62,6 @@ int find_next_hop(int current_node, int destination_node, int graph[MAX_NODES][M
     if (predecessors[destination_node] == -1)
         return -1;
 
-    // Реконструкция пути и получение следующего узла
     int next_hop = destination_node;
     while (predecessors[next_hop] != current_node)
     {
@@ -71,15 +73,13 @@ int find_next_hop(int current_node, int destination_node, int graph[MAX_NODES][M
 
 void send_mac_packet(Packet *packet)
 {
-    if (packet->mac_packet.ttl <= 0)
+    if (packet->mac_packet.ttl == 0)
     {
-        log_message("CLIENT", MSG_TYPE_ERROR, "TTL expired, packet dropped");
+        log_message("CLIENT", MSG_TYPE_NOT_VALID_DATA, "TTL expired, packet dropped");
         return;
     }
 
     int next_node = find_next_hop(node_id, packet->mac_packet.mac_receiver, packet->network_graph, MAX_NODES);
-
-    printf("next_node: %d\n", next_node);
 
     if (next_node == -1)
     {
@@ -101,53 +101,6 @@ void send_mac_packet(Packet *packet)
     else
     {
         log_message("CLIENT", MSG_TYPE_DATA, "Sent MAC packet from %d to node %d, ttl %d", node_id, next_node, packet->mac_packet.ttl);
-    }
-}
-
-void receive_packet()
-{
-    Packet packet;
-    struct sockaddr_in sender_addr;
-    socklen_t addr_len = sizeof(sender_addr);
-
-    while (1)
-    {
-        int recv_bytes = recvfrom(client_socket, &packet, sizeof(Packet), 0, (struct sockaddr *)&sender_addr, &addr_len);
-
-        if (recv_bytes == -1)
-        {
-            log_message("CLIENT", MSG_TYPE_ERROR, "recvfrom failed");
-            continue;
-        }
-
-        if (recv_bytes == sizeof(Packet))
-        {
-            uint16_t current_crc = calculate_crc((char *)&packet.mac_packet.message, sizeof(packet.mac_packet.message_length));
-
-            if (packet.mac_packet.crc == current_crc)
-            {
-                if (packet.type == PACKET_TYPE_MAC)
-                {
-
-                    if (packet.mac_packet.mac_receiver == node_id)
-                    {
-                        log_message("CLIENT", MSG_TYPE_DATA, "Message for this node: %s", packet.mac_packet.message);
-                    }
-                    else if (packet.mac_packet.ttl > 0)
-                    {
-                        send_mac_packet(&packet);
-                    }
-                    else
-                    {
-                        log_message("CLIENT", MSG_TYPE_ERROR, "TTL expired, packet dropped");
-                    }
-                }
-            }
-            else
-            {
-                log_message("CLIENT", MSG_TYPE_ERROR, "Received non-normal packet type");
-            }
-        }
     }
 }
 
@@ -188,10 +141,59 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    pthread_t recv_thread;
-    pthread_create(&recv_thread, NULL, (void *)receive_packet, NULL);
+    int flags = fcntl(client_socket, F_GETFL, 0);
+    fcntl(client_socket, F_SETFL, flags | O_NONBLOCK);
 
-    pthread_join(recv_thread, NULL);
+    struct sockaddr_in sender_addr;
+    socklen_t addr_len = sizeof(sender_addr);
+
+    while (1)
+    {
+        Packet packet;
+        int recv_bytes = recvfrom(client_socket, &packet, sizeof(Packet), 0, (struct sockaddr *)&sender_addr, &addr_len);
+
+        if (recv_bytes == -1)
+        {
+            if (errno == EWOULDBLOCK || errno == EAGAIN)
+            {
+                usleep(100000);
+                continue;
+            }
+            else
+            {
+                log_message("CLIENT", MSG_TYPE_ERROR, "recvfrom failed");
+                continue;
+            }
+        }
+
+        if (recv_bytes == sizeof(Packet))
+        {
+            uint16_t current_crc = calculate_crc((char *)&packet.mac_packet.message, sizeof(packet.mac_packet.message_length));
+
+            if (packet.mac_packet.crc == current_crc)
+            {
+                if (packet.type == PACKET_TYPE_MAC)
+                {
+                    if (packet.mac_packet.mac_receiver == node_id)
+                    {
+                        log_message("CLIENT", MSG_TYPE_DATA, "Message for this node: %s", packet.mac_packet.message);
+                    }
+                    else if (packet.mac_packet.ttl > 0)
+                    {
+                        send_mac_packet(&packet);
+                    }
+                    else
+                    {
+                        log_message("CLIENT", MSG_TYPE_ERROR, "TTL expired, packet dropped");
+                    }
+                }
+            }
+            else
+            {
+                log_message("CLIENT", MSG_TYPE_ERROR, "Received non-normal packet type");
+            }
+        }
+    }
 
     return EXIT_SUCCESS;
 }
