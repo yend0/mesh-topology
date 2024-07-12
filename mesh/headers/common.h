@@ -7,7 +7,8 @@ typedef enum
 {
     MSG_TYPE_DATA,
     MSG_TYPE_COMMAND,
-    MSG_TYPE_ERROR
+    MSG_TYPE_ERROR,
+    MSG_TYPE_NOT_VALID_DATA
 
 } message_type;
 
