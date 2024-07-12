@@ -1,6 +1,8 @@
 #ifndef CONSTANTS_H
 #define CONSTANTS_H
 
+#define SERVER_ID 100
+
 #define CLIENT_BASE_PORT 1000
 #define SERVER_PORT 999
 
