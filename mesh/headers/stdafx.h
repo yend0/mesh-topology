@@ -12,5 +12,6 @@
 #include <stdarg.h>
 #include <limits.h>
 #include <stdbool.h>
+#include <sys/file.h>
 
 #endif // STDAFX_H

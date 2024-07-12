@@ -1,7 +1,5 @@
 #include "logger.h"
 
-pthread_mutex_t log_mutex = PTHREAD_MUTEX_INITIALIZER;
-
 const char *get_message_type_string(const message_type type)
 {
     switch (type)
@@ -17,18 +15,22 @@ const char *get_message_type_string(const message_type type)
     }
 }
 
-void log_message(const char *creator, const message_type type,
-                 const char *message_format, ...)
+void log_message(const char *creator, const message_type type, const char *message_format, ...)
 {
     FILE *logfile = fopen(LOG_FILE, "a");
-
     if (!logfile)
     {
         perror("Failed to open log file.");
         return;
     }
 
-    pthread_mutex_lock(&log_mutex);
+    int fd = fileno(logfile);
+    if (flock(fd, LOCK_EX) == -1)
+    {
+        perror("Failed to lock log file.");
+        fclose(logfile);
+        return;
+    }
 
     time_t now = time(NULL);
     struct tm *t = localtime(&now);
@@ -44,7 +46,7 @@ void log_message(const char *creator, const message_type type,
 
     fprintf(logfile, "\n");
 
-    pthread_mutex_unlock(&log_mutex);
-
+    fflush(logfile);
+    flock(fd, LOCK_UN);
     fclose(logfile);
 }
