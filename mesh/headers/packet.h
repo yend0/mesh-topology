@@ -8,11 +8,11 @@ typedef enum
 {
     PACKET_TYPE_MAC,
     PACKET_TYPE_APP
-} packet_type;
+} packet_t;
 
 typedef struct
 {
-    packet_type type;
+    packet_t type;
 
     int network_graph[MAX_NODES][MAX_NODES];
 
