@@ -71,7 +71,7 @@ int find_next_hop(int current_node, int destination_node, int graph[MAX_NODES][M
     return next_hop;
 }
 
-void send_mac_packet(Packet *packet)
+void send_packet(packet_t *packet)
 {
     if (packet->mac_packet.ttl == 0)
     {
@@ -93,7 +93,7 @@ void send_mac_packet(Packet *packet)
     node_address.sin_port = htons(CLIENT_BASE_PORT + next_node);
     node_address.sin_addr.s_addr = INADDR_ANY;
 
-    int sent_bytes = sendto(client_socket, packet, sizeof(Packet), 0, (struct sockaddr *)&node_address, sizeof(node_address));
+    int sent_bytes = sendto(client_socket, packet, sizeof(packet_t), 0, (struct sockaddr *)&node_address, sizeof(node_address));
     if (sent_bytes == -1)
     {
         log_message("CLIENT", MSG_TYPE_ERROR, "sendto() failed");
@@ -149,8 +149,8 @@ int main(int argc, char *argv[])
 
     while (1)
     {
-        Packet packet;
-        int recv_bytes = recvfrom(client_socket, &packet, sizeof(Packet), 0, (struct sockaddr *)&sender_addr, &addr_len);
+        packet_t packet;
+        int recv_bytes = recvfrom(client_socket, &packet, sizeof(packet_t), 0, (struct sockaddr *)&sender_addr, &addr_len);
 
         if (recv_bytes == -1)
         {
@@ -166,26 +166,24 @@ int main(int argc, char *argv[])
             }
         }
 
-        if (recv_bytes == sizeof(Packet))
+        if (recv_bytes == sizeof(packet_t))
         {
-            uint16_t current_crc = calculate_crc((char *)&packet.mac_packet.message, sizeof(packet.mac_packet.message_length));
+            uint16_t current_crc = calculate_crc((const char *)&packet.mac_packet.app_packet, sizeof(packet.mac_packet.app_packet));
 
             if (packet.mac_packet.crc == current_crc)
             {
-                if (packet.type == PACKET_TYPE_MAC)
+
+                if (packet.mac_packet.mac_receiver == node_id)
                 {
-                    if (packet.mac_packet.mac_receiver == node_id)
-                    {
-                        log_message("CLIENT", MSG_TYPE_DATA, "Message for this node: %s", packet.mac_packet.message);
-                    }
-                    else if (packet.mac_packet.ttl > 0)
-                    {
-                        send_mac_packet(&packet);
-                    }
-                    else
-                    {
-                        log_message("CLIENT", MSG_TYPE_ERROR, "TTL expired, packet dropped");
-                    }
+                    log_message("CLIENT", MSG_TYPE_DATA, "Message for this node: %s", packet.mac_packet.app_packet.message);
+                }
+                else if (packet.mac_packet.ttl > 0)
+                {
+                    send_packet(&packet);
+                }
+                else
+                {
+                    log_message("CLIENT", MSG_TYPE_NOT_VALID_DATA, "TTL expired, packet dropped");
                 }
             }
             else
