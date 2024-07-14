@@ -62,6 +62,15 @@ void add_edge(int u, int v, int weight, int graph[MAX_NODES][MAX_NODES])
     graph[v][u] = weight;
 }
 
+void remove_node(int node_id, int graph[MAX_NODES][MAX_NODES])
+{
+    for (int i = 0; i < MAX_NODES; i++)
+    {
+        graph[node_id][i] = INF;
+        graph[i][node_id] = INF;
+    }
+}
+
 void dijkstra(int graph[MAX_NODES][MAX_NODES], int start_node, int num_nodes, int distances[MAX_NODES], int predecessors[MAX_NODES])
 {
     bool visited[MAX_NODES];
