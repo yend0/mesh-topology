@@ -6,8 +6,6 @@
 
 #define LOG_FILE "log_program.log"
 
-extern pthread_mutex_t log_mutex;
-
 const char *get_message_type_string(const message_type type);
 void log_message(const char *creator, const message_type type,
                  const char *message_format, ...);
