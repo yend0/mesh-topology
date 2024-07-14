@@ -10,6 +10,8 @@ const char *get_message_type_string(const message_type type)
         return "COMMAND";
     case MSG_TYPE_ERROR:
         return "ERROR";
+    case MSG_TYPE_NOT_VALID_DATA:
+        return "NOT VALID DATA";
     default:
         return "UNKNOWN";
     }
