@@ -1,5 +1,14 @@
 #include "logger.h"
 
+/**
+ * @brief Converts the message type to a string for output.
+ *
+ * The function takes a message type and returns its string representation,
+ * which makes it convenient to display message types in logs.
+ *
+ * @param type The message type (message_type) to be converted.
+ * @return String representation of the message type.
+ */
 const char *get_message_type_string(const message_type type)
 {
     switch (type)
@@ -17,6 +26,18 @@ const char *get_message_type_string(const message_type type)
     }
 }
 
+/**
+ * @brief Writes the message to a log file.
+ *
+ * The function opens a log file, locks it, writes a message into it with the creator, message type and timestamp, and then closes the file.
+ * specifying the creator, message type and timestamp, and then closes the file.
+ * Error handling is performed for file opening and locking.
+ *
+ * @param creator The name or identifier of the message creator.
+ * @param type The type of message (message_type) to be logged.
+ * @param message_format A message format that supports a variable number of arguments (printf-style).
+ * @param ... Variable number of arguments to format the message.
+ */
 void log_message(const char *creator, const message_type type, const char *message_format, ...)
 {
     FILE *logfile = fopen(LOG_FILE, "a");

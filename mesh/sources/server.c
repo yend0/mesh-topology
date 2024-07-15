@@ -7,6 +7,15 @@ pid_t node_pids[MAX_NODES];
 int server_socket;
 struct sockaddr_in server_address;
 
+/**
+ * @brief Starts the node in a separate process.
+ *
+ * The function creates a new process to start the node.
+ * Uses fork() to create a child process,
+ * which is then replaced by the node executable using execl().
+ *
+ * @param node_id The identifier of the node to run.
+ */
 void start_node(const int node_id)
 {
     pid_t pid = fork();
@@ -28,6 +37,15 @@ void start_node(const int node_id)
     }
 }
 
+/**
+ * @brief Stops the node if it is running.
+ *
+ * The function sends a SIGTERM signal to a running node
+ * * and waits for it to complete. If the node is not running, the function
+ * writes an error to the log.
+ *
+ * @param node_id Identifier of the node to stop.
+ */
 void stop_node(const int node_id)
 {
     if (node_pids[node_id] > 0)
@@ -43,6 +61,15 @@ void stop_node(const int node_id)
     }
 }
 
+/**
+ * @brief Processes the termination signal and stops all active nodes.
+ *
+ * The function is called when a signal (such as SIGINT) is received.
+ * It traverses all nodes and calls a function to stop them.
+ * After stopping the nodes, it closes the server socket and terminates the program.
+ *
+ * @param sig The identifier of the signal that was received.
+ */
 void handle_signal(const int sig)
 {
     for (int i = 0; i < MAX_NODES; ++i)
@@ -56,6 +83,16 @@ void handle_signal(const int sig)
     exit(EXIT_SUCCESS);
 }
 
+/**
+ * @brief Processes user commands to manage a network of nodes.
+ *
+ * The function constantly waits for commands from the user and performs the appropriate actions
+ * depending on the command entered. Commands include sending messages, broadcasting,
+ * stopping nodes, and displaying help information.
+ *
+ * @param graph The adjacency matrix of the node network graph.
+ * @param client_socket The socket for sending data.
+ */
 void handle_user_commands(int graph[MAX_NODES][MAX_NODES], int client_socket)
 {
     while (1)

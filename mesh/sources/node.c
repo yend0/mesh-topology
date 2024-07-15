@@ -7,6 +7,19 @@
 int node_id;
 int client_socket;
 
+/**
+ * @brief Finds the next node to forward the packet through the graph.
+ *
+ * The function implements the shortest path search algorithm (Dijkstra)
+ * to determine the next node through which to send a packet
+ * from the current node to the target node.
+ *
+ * @param current_node The current node from which the packet is being sent.
+ * @param destination_node The destination node to which the packet should be sent.
+ * @param graph The adjacency matrix representing the graph.
+ * @param size The size of the graph (number of nodes).
+ * @return The index of the next node to forward the packet to, or -1 if no path is found.
+ */
 int find_next_hop(int current_node, int destination_node, int graph[MAX_NODES][MAX_NODES], int size)
 {
     int distances[MAX_NODES];
@@ -66,6 +79,14 @@ int find_next_hop(int current_node, int destination_node, int graph[MAX_NODES][M
     return next_hop;
 }
 
+/**
+ * @brief Broadcast packet sending.
+ *
+ * The function processes broadcast packets by checking for duplicates
+ * and sends the packet to all nodes within a radius of 3 from the current node.
+ *
+ * @param packet Pointer to the packet to be sent.
+ */
 void broadcast_signal(packet_t *packet)
 {
     static int processed_broadcasts[MAX_NODES] = {0};
@@ -112,6 +133,14 @@ void broadcast_signal(packet_t *packet)
     }
 }
 
+/**
+ * @brief Sending a packet to the next node.
+ *
+ * The function handles the sending of the packet. If the TTL of the packet has expired, it is discarded.
+ * Otherwise, the next node to route the packet is determined.
+ *
+ * @param packet Pointer to the packet to be sent.
+ */
 void send_packet(packet_t *packet)
 {
     if (packet->mac_packet.ttl == 0)
@@ -164,6 +193,14 @@ void send_packet(packet_t *packet)
     }
 }
 
+/**
+ * @brief Processes the termination signal.
+ *
+ * The function is called when the signal is received.
+ * It closes the client socket and terminates the program with a success code.
+ *
+ * @param sig The identifier of the signal that was received.
+ */
 void handle_signal(int sig)
 {
     close(client_socket);
