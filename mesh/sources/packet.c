@@ -20,9 +20,9 @@ packet_t create_packet(uint8_t mac_sender, uint8_t mac_receiver, uint8_t ttl,
 
     packet.mac_packet.app_packet.crc = calculate_crc((const char *)&packet.mac_packet.app_packet.message, sizeof(packet.mac_packet.app_packet.message_length));
 
-    packet.mac_packet.message_length = sizeof(app_packet_t) - MAX_MESSAGE_LENGTH + packet.mac_packet.app_packet.message_length + 2;
-
     packet.mac_packet.crc = calculate_crc((const char *)&packet.mac_packet.app_packet, sizeof(packet.mac_packet.app_packet));
+
+    packet.mac_packet.message_length = sizeof(app_packet_t) - MAX_MESSAGE_LENGTH + packet.mac_packet.app_packet.message_length + 2;
 
     return packet;
 }
