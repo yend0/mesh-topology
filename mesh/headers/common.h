@@ -5,7 +5,7 @@
 
 typedef enum
 {
-    MSG_TYPE_DATA,
+    MSG_TYPE_INFO,
     MSG_TYPE_COMMAND,
     MSG_TYPE_ERROR,
     MSG_TYPE_NOT_VALID_DATA
