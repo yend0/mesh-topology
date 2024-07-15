@@ -35,5 +35,5 @@ typedef struct
 } packet_t;
 
 packet_t create_packet(uint8_t mac_sender, uint8_t mac_receiver, uint8_t ttl,
-                       uint8_t app_sender, uint8_t app_receiver, uint16_t message_id, const char *message);
+                       uint8_t app_sender, uint8_t app_receiver, const char *message);
 #endif // PACKET_H

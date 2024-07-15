@@ -36,7 +36,7 @@ void send_command_to_node(packet_t *packet, int client_socket)
 
 void create_and_send_message(const int src, const int dest, int graph[MAX_NODES][MAX_NODES], const int size_graph, const char *message, int client_socket)
 {
-    packet_t packet = create_packet(src, dest, TTL_LIMIT, src, dest, 0, message);
+    packet_t packet = create_packet(src, dest, TTL_LIMIT, src, dest, message);
 
     memcpy(packet.network_graph, graph, size_graph * size_graph * sizeof(int));
 
@@ -45,7 +45,7 @@ void create_and_send_message(const int src, const int dest, int graph[MAX_NODES]
 
 void create_and_send_broadcast(const int src, int graph[MAX_NODES][MAX_NODES], const int size_graph, const char *message, int client_socket)
 {
-    packet_t packet = create_packet(src, BROADCAST_NODE, TTL_LIMIT, src, BROADCAST_NODE, 0, message);
+    packet_t packet = create_packet(src, BROADCAST_NODE, TTL_LIMIT, src, BROADCAST_NODE, message);
 
     memcpy(packet.network_graph, graph, size_graph * size_graph * sizeof(int));
 
