@@ -1,9 +1,4 @@
-#include <sys/socket.h>
-#include <netinet/in.h>
 #include <errno.h>
-#include <unistd.h>
-#include <signal.h>
-#include <fcntl.h>
 
 #include "constants.h"
 #include "logger.h"
