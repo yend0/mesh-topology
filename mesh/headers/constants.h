@@ -10,6 +10,7 @@
 #define MAX_MESSAGE_LENGTH 150
 
 #define BROADCAST_RADIUS 3
+#define BROADCAST_NODE 0xFF
 
 #define TTL_LIMIT 24
 
