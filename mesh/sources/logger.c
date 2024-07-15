@@ -4,8 +4,8 @@ const char *get_message_type_string(const message_type type)
 {
     switch (type)
     {
-    case MSG_TYPE_DATA:
-        return "DATA";
+    case MSG_TYPE_INFO:
+        return "INFORMATION";
     case MSG_TYPE_COMMAND:
         return "COMMAND";
     case MSG_TYPE_ERROR:
