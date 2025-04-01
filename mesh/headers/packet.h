@@ -4,45 +4,36 @@
 #include "constants.h"
 #include "common.h"
 
-typedef enum
+typedef struct
 {
-    PACKET_TYPE_MAC,
-    PACKET_TYPE_APP
-} packet_type;
+    uint8_t app_sender;
+    uint8_t app_receiver;
+    uint16_t message_id;
+    uint8_t message_length;
+    char message[MAX_MESSAGE_LENGTH];
+    uint16_t crc;
+} app_packet_t;
 
 typedef struct
 {
-    packet_type type;
+    uint8_t mac_sender;
+    uint8_t mac_receiver;
+    uint8_t ttl;
+    uint8_t message_length;
+    app_packet_t app_packet;
+    uint16_t crc;
+} mac_packet_t;
 
+typedef struct
+{
     int network_graph[MAX_NODES][MAX_NODES];
-
     union
     {
-        struct
-        {
-            uint8_t mac_sender;
-            uint8_t mac_receiver;
-            uint8_t ttl;
-            uint8_t message_length;
-            char message[MAX_MESSAGE_LENGTH];
-            uint16_t crc;
-        } mac_packet;
+        mac_packet_t mac_packet;
+        app_packet_t app_packet;
     };
+} packet_t;
 
-} Packet;
-
-Packet create_mac_packet(uint8_t sender, uint8_t receiver, uint8_t ttl, const char *message)
-{
-    Packet packet;
-    packet.type = PACKET_TYPE_MAC;
-    packet.mac_packet.mac_sender = sender;
-    packet.mac_packet.mac_receiver = receiver;
-    packet.mac_packet.ttl = ttl;
-    packet.mac_packet.message_length = strlen(message);
-    strncpy(packet.mac_packet.message, message, MAX_MESSAGE_LENGTH);
-    packet.mac_packet.crc = calculate_crc((char *)&packet.mac_packet.message, sizeof(packet.mac_packet.message_length));
-
-    return packet;
-}
-
+packet_t create_packet(uint8_t mac_sender, uint8_t mac_receiver, uint8_t ttl,
+                       uint8_t app_sender, uint8_t app_receiver, const char *message);
 #endif // PACKET_H

@@ -1,5 +1,3 @@
-#include <sys/socket.h>
-#include <netinet/in.h>
 #include <errno.h>
 
 #include "constants.h"
@@ -9,6 +7,19 @@
 int node_id;
 int client_socket;
 
+/**
+ * @brief Finds the next node to forward the packet through the graph.
+ *
+ * The function implements the shortest path search algorithm (Dijkstra)
+ * to determine the next node through which to send a packet
+ * from the current node to the target node.
+ *
+ * @param current_node The current node from which the packet is being sent.
+ * @param destination_node The destination node to which the packet should be sent.
+ * @param graph The adjacency matrix representing the graph.
+ * @param size The size of the graph (number of nodes).
+ * @return The index of the next node to forward the packet to, or -1 if no path is found.
+ */
 int find_next_hop(int current_node, int destination_node, int graph[MAX_NODES][MAX_NODES], int size)
 {
     int distances[MAX_NODES];
@@ -59,7 +70,6 @@ int find_next_hop(int current_node, int destination_node, int graph[MAX_NODES][M
     if (predecessors[destination_node] == -1)
         return -1;
 
-    // Реконструкция пути и получение следующего узла
     int next_hop = destination_node;
     while (predecessors[next_hop] != current_node)
     {
@@ -69,88 +79,128 @@ int find_next_hop(int current_node, int destination_node, int graph[MAX_NODES][M
     return next_hop;
 }
 
-void send_mac_packet(Packet *packet)
+/**
+ * @brief Broadcast packet sending.
+ *
+ * The function processes broadcast packets by checking for duplicates
+ * and sends the packet to all nodes within a radius of 3 from the current node.
+ *
+ * @param packet Pointer to the packet to be sent.
+ */
+void broadcast_signal(packet_t *packet)
 {
-    if (packet->mac_packet.ttl <= 0)
+    static int processed_broadcasts[MAX_NODES] = {0};
+
+    if (processed_broadcasts[packet->mac_packet.mac_sender])
     {
-        log_message("CLIENT", MSG_TYPE_ERROR, "TTL expired, packet dropped");
+        log_message("CLIENT", MSG_TYPE_NOT_VALID_DATA, "Duplicate broadcast packet received, packet dropped");
+        return;
+    }
+
+    processed_broadcasts[packet->mac_packet.mac_sender] = 1;
+
+    for (int i = 0; i < MAX_NODES; i++)
+    {
+        if (i != node_id && packet->network_graph[node_id][i] != INF && packet->network_graph[node_id][i] <= 3)
+        {
+            struct sockaddr_in node_address;
+            node_address.sin_family = AF_INET;
+            node_address.sin_port = htons(CLIENT_BASE_PORT + i);
+            node_address.sin_addr.s_addr = INADDR_ANY;
+
+            char compressed_data[sizeof(packet_t)];
+            size_t compressed_size = sizeof(packet_t);
+
+            int compress_result = compress_data((char *)packet, sizeof(packet_t), compressed_data, &compressed_size);
+
+            if (compress_result)
+            {
+                log_message("CLIENT", MSG_TYPE_ERROR, "Compression failed");
+                continue;
+            }
+
+            int sent_bytes = sendto(client_socket, compressed_data, compressed_size, 0, (struct sockaddr *)&node_address, sizeof(node_address));
+
+            if (sent_bytes == -1)
+            {
+                log_message("CLIENT", MSG_TYPE_ERROR, "Broadcast sendto() failed to node %d", i);
+            }
+            else
+            {
+                log_message("CLIENT", MSG_TYPE_INFO, "Broadcast packet sent to node %d", i);
+            }
+        }
+    }
+}
+
+/**
+ * @brief Sending a packet to the next node.
+ *
+ * The function handles the sending of the packet. If the TTL of the packet has expired, it is discarded.
+ * Otherwise, the next node to route the packet is determined.
+ *
+ * @param packet Pointer to the packet to be sent.
+ */
+void send_packet(packet_t *packet)
+{
+    if (packet->mac_packet.ttl == 0)
+    {
+        log_message("CLIENT", MSG_TYPE_NOT_VALID_DATA, "TTL expired, packet dropped");
+        return;
+    }
+
+    packet->mac_packet.ttl--;
+
+    if (packet->mac_packet.mac_receiver == BROADCAST_NODE)
+    {
+        broadcast_signal(packet);
         return;
     }
 
     int next_node = find_next_hop(node_id, packet->mac_packet.mac_receiver, packet->network_graph, MAX_NODES);
-
-    printf("next_node: %d\n", next_node);
 
     if (next_node == -1)
     {
         log_message("CLIENT", MSG_TYPE_ERROR, "Next hop not found, packet dropped");
         return;
     }
-    packet->mac_packet.ttl--;
 
     struct sockaddr_in node_address;
     node_address.sin_family = AF_INET;
     node_address.sin_port = htons(CLIENT_BASE_PORT + next_node);
     node_address.sin_addr.s_addr = INADDR_ANY;
 
-    int sent_bytes = sendto(client_socket, packet, sizeof(Packet), 0, (struct sockaddr *)&node_address, sizeof(node_address));
+    char compressed_data[sizeof(packet_t)];
+    size_t compressed_size = sizeof(packet_t);
+
+    int compress_result = compress_data((char *)packet, sizeof(packet_t), compressed_data, &compressed_size);
+
+    if (compress_result)
+    {
+        log_message("CLIENT", MSG_TYPE_ERROR, "Compression failed");
+        return;
+    }
+
+    int sent_bytes = sendto(client_socket, compressed_data, compressed_size, 0, (struct sockaddr *)&node_address, sizeof(node_address));
+
     if (sent_bytes == -1)
     {
         log_message("CLIENT", MSG_TYPE_ERROR, "sendto() failed");
     }
     else
     {
-        log_message("CLIENT", MSG_TYPE_DATA, "Sent MAC packet from %d to node %d, ttl %d", node_id, next_node, packet->mac_packet.ttl);
+        log_message("CLIENT", MSG_TYPE_INFO, "Sent MAC packet from %d to node %d, ttl %d", node_id, next_node, packet->mac_packet.ttl);
     }
 }
 
-void receive_packet()
-{
-    Packet packet;
-    struct sockaddr_in sender_addr;
-    socklen_t addr_len = sizeof(sender_addr);
-
-    while (1)
-    {
-        int recv_bytes = recvfrom(client_socket, &packet, sizeof(Packet), 0, (struct sockaddr *)&sender_addr, &addr_len);
-
-        if (recv_bytes == -1)
-        {
-            log_message("CLIENT", MSG_TYPE_ERROR, "recvfrom failed");
-            continue;
-        }
-
-        if (recv_bytes == sizeof(Packet))
-        {
-            uint16_t current_crc = calculate_crc((char *)&packet.mac_packet.message, sizeof(packet.mac_packet.message_length));
-
-            if (packet.mac_packet.crc == current_crc)
-            {
-                if (packet.type == PACKET_TYPE_MAC)
-                {
-
-                    if (packet.mac_packet.mac_receiver == node_id)
-                    {
-                        log_message("CLIENT", MSG_TYPE_DATA, "Message for this node: %s", packet.mac_packet.message);
-                    }
-                    else if (packet.mac_packet.ttl > 0)
-                    {
-                        send_mac_packet(&packet);
-                    }
-                    else
-                    {
-                        log_message("CLIENT", MSG_TYPE_ERROR, "TTL expired, packet dropped");
-                    }
-                }
-            }
-            else
-            {
-                log_message("CLIENT", MSG_TYPE_ERROR, "Received non-normal packet type");
-            }
-        }
-    }
-}
-
+/**
+ * @brief Processes the termination signal.
+ *
+ * The function is called when the signal is received.
+ * It closes the client socket and terminates the program with a success code.
+ *
+ * @param sig The identifier of the signal that was received.
+ */
 void handle_signal(int sig)
 {
     close(client_socket);
@@ -188,10 +238,72 @@ int main(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
-    pthread_t recv_thread;
-    pthread_create(&recv_thread, NULL, (void *)receive_packet, NULL);
+    int flags = fcntl(client_socket, F_GETFL, 0);
+    fcntl(client_socket, F_SETFL, flags | O_NONBLOCK);
 
-    pthread_join(recv_thread, NULL);
+    char buffer[sizeof(packet_t)];
+    char decompressed_data[sizeof(packet_t)];
+    size_t decompressed_size = sizeof(decompressed_data);
+
+    struct sockaddr_in sender_addr;
+    socklen_t addr_len = sizeof(sender_addr);
+
+    while (1)
+    {
+        int recv_bytes = recvfrom(client_socket, buffer, sizeof(buffer), 0, (struct sockaddr *)&sender_addr, &addr_len);
+
+        if (recv_bytes == -1)
+        {
+            if (errno == EWOULDBLOCK || errno == EAGAIN)
+            {
+                usleep(100000);
+                continue;
+            }
+            else
+            {
+                log_message("CLIENT", MSG_TYPE_ERROR, "recvfrom failed");
+                continue;
+            }
+        }
+
+        if (recv_bytes > 0)
+        {
+            int decompress_result = decompress_data(buffer, sizeof(packet_t), decompressed_data, &decompressed_size);
+
+            if (decompress_result != Z_OK)
+            {
+                log_message("CLIENT", MSG_TYPE_ERROR, "Decompression failed");
+                continue;
+            }
+
+            packet_t *packet = (packet_t *)decompressed_data;
+
+            uint16_t app_crc = calculate_crc((const char *)&packet->mac_packet.app_packet.message, sizeof(packet->mac_packet.app_packet.message_length));
+
+            uint16_t mac_crc = calculate_crc((const char *)&packet->mac_packet.app_packet, sizeof(packet->mac_packet.app_packet));
+
+            if (packet->mac_packet.app_packet.crc == app_crc && packet->mac_packet.crc == mac_crc)
+            {
+
+                if (packet->mac_packet.mac_receiver == node_id)
+                {
+                    log_message("CLIENT", MSG_TYPE_INFO, "Message for this node: %s", packet->mac_packet.app_packet.message);
+                }
+                else if (packet->mac_packet.ttl > 0)
+                {
+                    send_packet(packet);
+                }
+                else
+                {
+                    log_message("CLIENT", MSG_TYPE_NOT_VALID_DATA, "TTL expired, packet dropped");
+                }
+            }
+            else
+            {
+                log_message("CLIENT", MSG_TYPE_ERROR, "Received packet with invalid CRC. Calculated MAC CRC: %u. Calculated APP CRC: %u", mac_crc, app_crc);
+            }
+        }
+    }
 
     return EXIT_SUCCESS;
 }

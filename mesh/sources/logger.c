@@ -1,34 +1,59 @@
 #include "logger.h"
 
-pthread_mutex_t log_mutex = PTHREAD_MUTEX_INITIALIZER;
-
+/**
+ * @brief Converts the message type to a string for output.
+ *
+ * The function takes a message type and returns its string representation,
+ * which makes it convenient to display message types in logs.
+ *
+ * @param type The message type (message_type) to be converted.
+ * @return String representation of the message type.
+ */
 const char *get_message_type_string(const message_type type)
 {
     switch (type)
     {
-    case MSG_TYPE_DATA:
-        return "DATA";
+    case MSG_TYPE_INFO:
+        return "INFORMATION";
     case MSG_TYPE_COMMAND:
         return "COMMAND";
     case MSG_TYPE_ERROR:
         return "ERROR";
+    case MSG_TYPE_NOT_VALID_DATA:
+        return "NOT VALID DATA";
     default:
         return "UNKNOWN";
     }
 }
 
-void log_message(const char *creator, const message_type type,
-                 const char *message_format, ...)
+/**
+ * @brief Writes the message to a log file.
+ *
+ * The function opens a log file, locks it, writes a message into it with the creator, message type and timestamp, and then closes the file.
+ * specifying the creator, message type and timestamp, and then closes the file.
+ * Error handling is performed for file opening and locking.
+ *
+ * @param creator The name or identifier of the message creator.
+ * @param type The type of message (message_type) to be logged.
+ * @param message_format A message format that supports a variable number of arguments (printf-style).
+ * @param ... Variable number of arguments to format the message.
+ */
+void log_message(const char *creator, const message_type type, const char *message_format, ...)
 {
     FILE *logfile = fopen(LOG_FILE, "a");
-
     if (!logfile)
     {
         perror("Failed to open log file.");
         return;
     }
 
-    pthread_mutex_lock(&log_mutex);
+    int fd = fileno(logfile);
+    if (flock(fd, LOCK_EX) == -1)
+    {
+        perror("Failed to lock log file.");
+        fclose(logfile);
+        return;
+    }
 
     time_t now = time(NULL);
     struct tm *t = localtime(&now);
@@ -44,7 +69,7 @@ void log_message(const char *creator, const message_type type,
 
     fprintf(logfile, "\n");
 
-    pthread_mutex_unlock(&log_mutex);
-
+    fflush(logfile);
+    flock(fd, LOCK_UN);
     fclose(logfile);
 }

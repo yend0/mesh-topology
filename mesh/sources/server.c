@@ -1,15 +1,22 @@
 #include <signal.h>
 #include <sys/wait.h>
 
-#include "graph.h"
-#include "logger.h"
-#include "packet.h"
+#include "user_interface.h"
 
 pid_t node_pids[MAX_NODES];
-int client_socket;
+int server_socket;
 struct sockaddr_in server_address;
 
-void start_node(int node_id)
+/**
+ * @brief Starts the node in a separate process.
+ *
+ * The function creates a new process to start the node.
+ * Uses fork() to create a child process,
+ * which is then replaced by the node executable using execl().
+ *
+ * @param node_id The identifier of the node to run.
+ */
+void start_node(const int node_id)
 {
     pid_t pid = fork();
     if (pid == 0)
@@ -30,13 +37,40 @@ void start_node(int node_id)
     }
 }
 
-void stop_node(int node_id)
+/**
+ * @brief Stops the node if it is running.
+ *
+ * The function sends a SIGTERM signal to a running node
+ * * and waits for it to complete. If the node is not running, the function
+ * writes an error to the log.
+ *
+ * @param node_id Identifier of the node to stop.
+ */
+void stop_node(const int node_id)
 {
-    kill(node_pids[node_id], SIGTERM);
-    waitpid(node_pids[node_id], NULL, 0);
+    if (node_pids[node_id] > 0)
+    {
+        kill(node_pids[node_id], SIGTERM);
+        waitpid(node_pids[node_id], NULL, 0);
+        node_pids[node_id] = 0;
+        log_message("SERVER", MSG_TYPE_INFO, "Node %d stopped", node_id);
+    }
+    else
+    {
+        log_message("SERVER", MSG_TYPE_ERROR, "Node %d is not running", node_id);
+    }
 }
 
-void handle_signal(int sig)
+/**
+ * @brief Processes the termination signal and stops all active nodes.
+ *
+ * The function is called when a signal (such as SIGINT) is received.
+ * It traverses all nodes and calls a function to stop them.
+ * After stopping the nodes, it closes the server socket and terminates the program.
+ *
+ * @param sig The identifier of the signal that was received.
+ */
+void handle_signal(const int sig)
 {
     for (int i = 0; i < MAX_NODES; ++i)
     {
@@ -45,46 +79,53 @@ void handle_signal(int sig)
             stop_node(i);
         }
     }
-    close(client_socket);
+    close(server_socket);
     exit(EXIT_SUCCESS);
 }
 
-void send_packet_to_next_node(Packet *packet)
+/**
+ * @brief Processes user commands to manage a network of nodes.
+ *
+ * The function constantly waits for commands from the user and performs the appropriate actions
+ * depending on the command entered. Commands include sending messages, broadcasting,
+ * stopping nodes, and displaying help information.
+ *
+ * @param graph The adjacency matrix of the node network graph.
+ * @param client_socket The socket for sending data.
+ */
+void handle_user_commands(int graph[MAX_NODES][MAX_NODES], int client_socket)
 {
-    if (packet->type == PACKET_TYPE_MAC)
+    while (1)
     {
-        if (packet->mac_packet.ttl <= 0)
+        char command[256];
+        printf("Enter command: ");
+        fgets(command, sizeof(command), stdin);
+
+        int src_node, dest_node, node_id;
+        char message[MAX_MESSAGE_LENGTH];
+
+        if (sscanf(command, "send %d %d %[^\n]", &src_node, &dest_node, message) == 3)
         {
-            log_message("SERVER", MSG_TYPE_ERROR, "TTL expired, packet dropped");
-            return;
+            create_and_send_message(src_node, dest_node, graph, MAX_NODES, message, client_socket);
         }
-        packet->mac_packet.ttl--;
-
-        struct sockaddr_in node_address;
-        node_address.sin_family = AF_INET;
-        node_address.sin_port = htons(CLIENT_BASE_PORT + 0);
-        node_address.sin_addr.s_addr = INADDR_ANY;
-
-        int sent_bytes = sendto(client_socket, packet, sizeof(Packet), 0, (struct sockaddr *)&node_address, sizeof(node_address));
-
-        if (sent_bytes == -1)
+        else if (sscanf(command, "broadcast %d %[^\n]", &src_node, message) == 2)
         {
-            log_message("SERVER", MSG_TYPE_ERROR, "sendto() failed");
+            create_and_send_broadcast(src_node, graph, MAX_NODES, message, client_socket);
+        }
+        else if (sscanf(command, "stop %d", &node_id) == 1)
+        {
+            stop_node(node_id);
+            remove_node(node_id, graph);
+        }
+        else if (strncmp(command, "help", 4) == 0)
+        {
+            print_help();
         }
         else
         {
-            log_message("SERVER", MSG_TYPE_DATA, "Sent MAC packet to node %d, ttl %d", 0, packet->mac_packet.ttl);
+            printf("Invalid command format. Type 'help' for a list of commands.\n");
         }
     }
-}
-
-void create_and_send_mac_packet(const int src, const int dest, int graph[MAX_NODES][MAX_NODES], const int size_graph, const char *message)
-{
-    Packet packet = create_mac_packet(src, dest, TTL_LIMIT, message);
-
-    memcpy(packet.network_graph, graph, size_graph * size_graph * sizeof(int));
-
-    send_packet_to_next_node(&packet);
 }
 
 int main()
@@ -94,14 +135,14 @@ int main()
     int graph[MAX_NODES][MAX_NODES];
     int matrix_size = 10;
 
-    initialize_graph(MAX_NODES, graph);
-    add_edges(matrix_size, graph);
-
     int distances[MAX_NODES];
     int predecessors[MAX_NODES];
 
-    client_socket = socket(AF_INET, SOCK_DGRAM, 0);
-    if (client_socket == -1)
+    initialize_graph(MAX_NODES, graph);
+    add_edges(matrix_size, graph);
+
+    server_socket = socket(AF_INET, SOCK_DGRAM, 0);
+    if (server_socket == -1)
     {
         log_message("SERVER", MSG_TYPE_ERROR, "Socket creation failed");
         exit(EXIT_FAILURE);
@@ -116,23 +157,7 @@ int main()
         start_node(i);
     }
 
-    while (1)
-    {
-        char command[256];
-        printf("Enter command (send <node_id> <message>): ");
-        fgets(command, sizeof(command), stdin);
-
-        int node_id;
-        char message[MAX_MESSAGE_LENGTH];
-        if (sscanf(command, "send %d %[^\n]", &node_id, message) == 2)
-        {
-            create_and_send_mac_packet(-1, node_id, graph, MAX_NODES, message);
-        }
-        else
-        {
-            printf("Invalid command format.\n");
-        }
-    }
+    handle_user_commands(graph, server_socket);
 
     handle_signal(SIGINT);
     return EXIT_SUCCESS;
